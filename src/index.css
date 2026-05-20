@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Clean dark palette — no heavy gradients */
+  --color-surface-950: #09090b;
+  --color-surface-900: #0f0f12;
+  --color-surface-800: #18181b;
+  --color-surface-700: #232329;
+  --color-surface-600: #2e2e36;
+  --color-surface-500: #3f3f46;
+  --color-surface-400: #52525b;
+
+  --color-accent-500: #6366f1;
+  --color-accent-400: #818cf8;
+  --color-accent-300: #a5b4fc;
+
+  /* Status */
+  --color-status-todo: #71717a;
+  --color-status-progress: #f59e0b;
+  --color-status-done: #22c55e;
+
+  /* Difficulty */
+  --color-diff-easy: #22c55e;
+  --color-diff-medium: #eab308;
+  --color-diff-hard: #ef4444;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-surface-950 text-zinc-200 font-sans antialiased;
+  min-height: 100vh;
+}
+
+/* Minimal scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-surface-600); border-radius: 3px; }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(80px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideOutRight {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(80px); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+.animate-slide-in-right { animation: slideInRight 0.3s ease-out forwards; }
+.animate-spin { animation: spin 1s linear infinite; }
