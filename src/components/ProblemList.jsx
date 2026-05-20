@@ -75,6 +75,22 @@ export default function ProblemList() {
     updateProblem(id, { status: next });
   };
 
+  const levelConfig = (level) => {
+    const levels = {
+      chill:    { emoji: '😌', label: 'Chill',    style: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10' },
+      moderate: { emoji: '🤔', label: 'Moderate', style: 'text-amber-400 border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10' },
+      tough:    { emoji: '😤', label: 'Tough',    style: 'text-orange-400 border-orange-500/20 bg-orange-500/5 hover:bg-orange-500/10' },
+      brutal:   { emoji: '🤯', label: 'Brutal',   style: 'text-red-400 border-red-500/20 bg-red-500/5 hover:bg-red-500/10' },
+    };
+    return levels[level] || { emoji: '🎯', label: 'Rate', style: 'text-zinc-600 border-surface-600 bg-transparent hover:border-surface-500 hover:text-zinc-400' };
+  };
+
+  const cycleLevel = (id, current) => {
+    const order = [null, 'chill', 'moderate', 'tough', 'brutal'];
+    const next = order[(order.indexOf(current) + 1) % order.length];
+    updateProblem(id, { userLevel: next });
+  };
+
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Top bar */}
@@ -208,19 +224,29 @@ export default function ProblemList() {
                           </span>
                         </div>
 
-                        {/* Bottom: status + notes */}
+                        {/* Bottom: status + level + notes */}
                         <div className="flex items-center justify-between">
-                          <button onClick={() => cycleStatus(p.id, p.status)}
-                            className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md border cursor-pointer transition-colors
-                              ${p.status === 'done' ? 'text-status-done border-status-done/20 bg-status-done/5 hover:bg-status-done/10' :
-                                p.status === 'in-progress' ? 'text-status-progress border-status-progress/20 bg-status-progress/5 hover:bg-status-progress/10' :
-                                'text-zinc-500 border-surface-600 bg-surface-800 hover:border-surface-500'}`}>
-                            <div className={`w-2 h-2 rounded-full
-                              ${p.status === 'done' ? 'bg-status-done' :
-                                p.status === 'in-progress' ? 'bg-status-progress' :
-                                'bg-zinc-600'}`} />
-                            {p.status === 'done' ? 'Done' : p.status === 'in-progress' ? 'Solving' : 'Todo'}
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button onClick={() => cycleStatus(p.id, p.status)}
+                              className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md border cursor-pointer transition-colors
+                                ${p.status === 'done' ? 'text-status-done border-status-done/20 bg-status-done/5 hover:bg-status-done/10' :
+                                  p.status === 'in-progress' ? 'text-status-progress border-status-progress/20 bg-status-progress/5 hover:bg-status-progress/10' :
+                                  'text-zinc-500 border-surface-600 bg-surface-800 hover:border-surface-500'}`}>
+                              <div className={`w-2 h-2 rounded-full
+                                ${p.status === 'done' ? 'bg-status-done' :
+                                  p.status === 'in-progress' ? 'bg-status-progress' :
+                                  'bg-zinc-600'}`} />
+                              {p.status === 'done' ? 'Done' : p.status === 'in-progress' ? 'Solving' : 'Todo'}
+                            </button>
+
+                            <button onClick={() => cycleLevel(p.id, p.userLevel)}
+                              className={`flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md border cursor-pointer transition-all
+                                ${levelConfig(p.userLevel).style}`}
+                              title="How tough was this for you?">
+                              <span className="text-sm leading-none">{levelConfig(p.userLevel).emoji}</span>
+                              <span className="hidden sm:inline">{levelConfig(p.userLevel).label}</span>
+                            </button>
+                          </div>
 
                           <button onClick={() => setNotesProblem(p)}
                             className={`p-1.5 rounded-md cursor-pointer transition-colors

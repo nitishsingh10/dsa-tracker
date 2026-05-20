@@ -1,7 +1,7 @@
 /**
  * Merge engine: reconcile new problems from sheet with existing localStorage data.
- * - New problems get status: "todo", starred: false, notes: ""
- * - Existing problems preserve status, starred, notes
+ * - New problems get status: "todo", starred: false, notes: "", userLevel: null
+ * - Existing problems preserve status, starred, notes, userLevel
  * - Sheet-sourced fields (name, link, class, etc.) get updated from latest data
  */
 export function mergeProblems(existingProblems = [], newProblems = []) {
@@ -23,6 +23,7 @@ export function mergeProblems(existingProblems = [], newProblems = []) {
         status: existing.status,
         starred: existing.starred,
         notes: existing.notes,
+        userLevel: existing.userLevel || null,
       });
     } else {
       // Brand new problem
@@ -31,6 +32,7 @@ export function mergeProblems(existingProblems = [], newProblems = []) {
         status: 'todo',
         starred: false,
         notes: '',
+        userLevel: null,
       });
       newCount++;
     }
