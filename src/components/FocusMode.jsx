@@ -1,25 +1,31 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTracker } from '../contexts/TrackerContext';
 import useTimer from '../hooks/useTimer';
 import { formatTime, formatTimeCompact } from '../utils/streakEngine';
+
+/**
+ * Build the proxied URL for embedding via our Vercel serverless function.
+ * In dev, falls back to opening in new tab.
+ */
+function getProxyUrl(originalUrl) {
+  if (!originalUrl) return null;
+  // Use our serverless proxy
+  return `/api/proxy?url=${encodeURIComponent(originalUrl)}`;
+}
 
 export default function FocusMode() {
   const { focusProblem, setFocusProblem, updateProblem, recordSession } = useTracker();
   const { seconds, isRunning, start, pause, stop, reset } = useTimer(0);
   const [notes, setNotes] = useState('');
-  const [iframeBlocked, setIframeBlocked] = useState(false);
-  const [popupWindow, setPopupWindow] = useState(null);
+  const [proxyFailed, setProxyFailed] = useState(false);
+  const iframeRef = useRef(null);
 
   useEffect(() => {
     if (focusProblem) {
       setNotes(focusProblem.notes || '');
+      setProxyFailed(false);
       reset(0);
       start();
-
-      // Check if iframe will likely be blocked
-      const url = focusProblem.link || '';
-      const blocked = /leetcode|geeksforgeeks|hackerrank|codeforces|codechef|interviewbit/i.test(url);
-      setIframeBlocked(blocked);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusProblem]);
@@ -34,12 +40,6 @@ export default function FocusMode() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusProblem, seconds]);
 
-  const openPopup = useCallback(() => {
-    if (!focusProblem?.link) return;
-    const w = window.open(focusProblem.link, '_blank', 'width=900,height=700');
-    setPopupWindow(w);
-  }, [focusProblem]);
-
   const handleExit = useCallback(() => {
     const elapsed = stop();
     if (focusProblem && elapsed > 0) {
@@ -48,12 +48,8 @@ export default function FocusMode() {
     if (focusProblem && notes !== (focusProblem.notes || '')) {
       updateProblem(focusProblem.id, { notes });
     }
-    if (popupWindow && !popupWindow.closed) {
-      // Don't close — user might still need it
-    }
-    setPopupWindow(null);
     setFocusProblem(null);
-  }, [focusProblem, stop, recordSession, updateProblem, notes, popupWindow, setFocusProblem]);
+  }, [focusProblem, stop, recordSession, updateProblem, notes, setFocusProblem]);
 
   const handleMarkDone = useCallback(() => {
     if (!focusProblem) return;
@@ -68,10 +64,17 @@ export default function FocusMode() {
     updateProblem(focusProblem.id, { status: next });
   }, [focusProblem, updateProblem]);
 
+  const openInNewTab = useCallback(() => {
+    if (focusProblem?.link) {
+      window.open(focusProblem.link, '_blank');
+    }
+  }, [focusProblem]);
+
   if (!focusProblem) return null;
 
   const timerDisplay = formatTime(seconds);
   const previousTime = focusProblem.timeSpent ? formatTimeCompact(focusProblem.timeSpent) : null;
+  const proxyUrl = getProxyUrl(focusProblem.link);
 
   const diffColors = {
     Easy: 'text-diff-easy',
@@ -133,6 +136,19 @@ export default function FocusMode() {
             </button>
           </div>
 
+          {/* Open in new tab */}
+          {focusProblem.link && (
+            <button
+              onClick={openInNewTab}
+              className="p-2 rounded-lg text-zinc-500 hover:text-white hover:bg-surface-700 transition-colors cursor-pointer"
+              title="Open in new tab"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+              </svg>
+            </button>
+          )}
+
           {/* Status cycle */}
           <button
             onClick={cycleStatus}
@@ -162,62 +178,40 @@ export default function FocusMode() {
 
       {/* Main content — split panel */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left: Problem iframe or open button */}
+        {/* Left: Problem embedded via proxy */}
         <div className="flex-1 flex flex-col bg-surface-950">
-          {focusProblem.link ? (
-            iframeBlocked ? (
-              /* Platform blocks iframes — show open button */
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center max-w-sm">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-surface-800 border border-surface-700 flex items-center justify-center">
-                    <svg className="w-8 h-8 text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                    </svg>
-                  </div>
-                  <p className="text-sm text-zinc-400 mb-1">
-                    {focusProblem.platform || 'This platform'} blocks embedded views
-                  </p>
-                  <p className="text-xs text-zinc-600 mb-5">
-                    The problem opens in a new window — your timer keeps running here
-                  </p>
-
-                  {popupWindow && !popupWindow.closed ? (
-                    <div className="flex items-center justify-center gap-2 text-sm text-emerald-400">
-                      <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      Problem window is open
-                    </div>
-                  ) : (
-                    <button
-                      onClick={openPopup}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent-500 hover:bg-accent-600 text-white text-sm font-medium rounded-xl transition-colors cursor-pointer"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                      </svg>
-                      Open Problem
-                    </button>
-                  )}
-
-                  <a
-                    href={focusProblem.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block mt-3 text-xs text-zinc-600 hover:text-zinc-400 transition-colors truncate max-w-xs mx-auto"
-                  >
-                    {focusProblem.link}
-                  </a>
+          {focusProblem.link && !proxyFailed ? (
+            <iframe
+              ref={iframeRef}
+              src={proxyUrl}
+              className="flex-1 w-full border-none bg-white"
+              title={focusProblem.problemName}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              onError={() => setProxyFailed(true)}
+            />
+          ) : focusProblem.link && proxyFailed ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center max-w-sm">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-surface-800 border border-surface-700 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
                 </div>
+                <p className="text-sm text-zinc-400 mb-1">Could not embed this page</p>
+                <p className="text-xs text-zinc-600 mb-5">
+                  Your timer keeps running — solve in a new tab
+                </p>
+                <button
+                  onClick={openInNewTab}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent-500 hover:bg-accent-600 text-white text-sm font-medium rounded-xl transition-colors cursor-pointer"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
+                  Open in New Tab
+                </button>
               </div>
-            ) : (
-              /* Try iframe */
-              <iframe
-                src={focusProblem.link}
-                className="flex-1 w-full border-none bg-white"
-                title={focusProblem.problemName}
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                onError={() => setIframeBlocked(true)}
-              />
-            )
+            </div>
           ) : (
             <div className="flex-1 flex items-center justify-center text-zinc-600 text-sm">
               No problem link available

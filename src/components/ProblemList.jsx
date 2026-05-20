@@ -196,83 +196,113 @@ export default function ProblemList() {
                     Learn
                   </a>
                 </div>
-
-                {/* Problem cards */}
+                {/* Problem list — compact rows */}
                 {!isCollapsed && (
-                  <div className="border-t border-surface-700 p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  <div className="border-t border-surface-700 divide-y divide-surface-700/50">
                     {topicProblems.map((p) => (
                       <div key={p.id}
-                        className={`rounded-lg border p-3.5 transition-all hover:border-surface-500
-                          ${p.status === 'done' ? 'bg-surface-900/50 border-surface-700/50' : 'bg-surface-900 border-surface-700'}`}>
+                        className={`flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-surface-700/20 group
+                          ${p.status === 'done' ? 'opacity-60' : ''}`}>
 
-                        {/* Top: name + star */}
-                        <div className="flex items-start justify-between gap-2 mb-2.5">
-                          <div className="min-w-0 flex-1">
-                            {p.link ? (
-                              <a href={p.link} target="_blank" rel="noopener noreferrer"
-                                className={`text-sm font-medium leading-snug transition-colors block
-                                  ${p.status === 'done' ? 'text-zinc-500 line-through' : 'text-zinc-100 hover:text-accent-400'}`}>
-                                {p.problemName}
-                                <svg className="w-3 h-3 text-zinc-600 inline ml-1 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
-                                </svg>
-                              </a>
-                            ) : (
-                              <span className={`text-sm font-medium leading-snug block
-                                ${p.status === 'done' ? 'text-zinc-500 line-through' : 'text-zinc-100'}`}>
-                                {p.problemName}
-                              </span>
-                            )}
-                          </div>
-                          <button onClick={() => updateProblem(p.id, { starred: !p.starred })}
-                            className={`shrink-0 mt-0.5 cursor-pointer ${p.starred ? 'text-amber-400' : 'text-zinc-700 hover:text-zinc-500'}`}>
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill={p.starred ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2}>
-                              <path d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
-                            </svg>
-                          </button>
+                        {/* Status dot */}
+                        <button onClick={() => cycleStatus(p.id, p.status)}
+                          className="shrink-0 cursor-pointer" title="Cycle status">
+                          <div className={`w-3 h-3 rounded-full border-2 transition-colors
+                            ${p.status === 'done' ? 'bg-status-done border-status-done' :
+                              p.status === 'in-progress' ? 'bg-status-progress/30 border-status-progress' :
+                              'border-zinc-600 hover:border-zinc-400'}`} />
+                        </button>
+
+                        {/* Problem name */}
+                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                          {p.link ? (
+                            <a href={p.link} target="_blank" rel="noopener noreferrer"
+                              className={`text-[13px] font-medium truncate transition-colors
+                                ${p.status === 'done' ? 'text-zinc-500 line-through' : 'text-zinc-200 hover:text-accent-400'}`}>
+                              {p.problemName}
+                            </a>
+                          ) : (
+                            <span className={`text-[13px] font-medium truncate
+                              ${p.status === 'done' ? 'text-zinc-500 line-through' : 'text-zinc-200'}`}>
+                              {p.problemName}
+                            </span>
+                          )}
+
+                          {/* User tags inline */}
+                          {(p.tags || []).map(tag => (
+                            <span key={tag} className="hidden sm:inline-flex items-center gap-0.5 text-[9px] text-violet-400/70 bg-violet-500/8 px-1.5 py-0.5 rounded shrink-0">
+                              #{tag}
+                              <button onClick={() => removeTag(p.id, tag)} className="hover:text-red-400 cursor-pointer text-[8px] leading-none">×</button>
+                            </span>
+                          ))}
                         </div>
 
-                        {/* Tags row: platform + difficulty + CW/HW */}
-                        <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+                        {/* Tags: platform + difficulty + type */}
+                        <div className="hidden sm:flex items-center gap-1.5 shrink-0">
                           {p.platform && (
-                            <span className="text-[11px] text-zinc-500 bg-surface-800 px-1.5 py-0.5 rounded">{p.platform}</span>
+                            <span className="text-[10px] text-zinc-600 bg-surface-800 px-1.5 py-0.5 rounded">{p.platform}</span>
                           )}
-                          <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded
+                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded
                             ${p.difficulty === 'Easy' ? 'text-diff-easy bg-diff-easy/10' :
                               p.difficulty === 'Medium' ? 'text-diff-medium bg-diff-medium/10' :
                               p.difficulty === 'Hard' ? 'text-diff-hard bg-diff-hard/10' :
                               'text-zinc-500 bg-surface-800'}`}>
                             {p.difficulty}
                           </span>
-                          <span className={`text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded
-                            ${p.type === 'homework' ? 'text-amber-500/70 bg-amber-500/5' : 'text-zinc-600 bg-surface-800'}`}>
+                          <span className={`text-[9px] uppercase tracking-wider font-semibold px-1 py-0.5 rounded
+                            ${p.type === 'homework' ? 'text-amber-500/60 bg-amber-500/5' : 'text-zinc-700 bg-surface-800'}`}>
                             {p.type === 'homework' ? 'HW' : 'CW'}
                           </span>
-                          {/* Time spent badge */}
-                          {(p.timeSpent || 0) > 0 && (
-                            <span className="text-[10px] text-cyan-500/70 bg-cyan-500/5 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              {formatTimeCompact(p.timeSpent)}
-                            </span>
-                          )}
                         </div>
 
-                        {/* User tags */}
-                        <div className="flex items-center gap-1 flex-wrap mb-1">
-                          {(p.tags || []).map(tag => (
-                            <span key={tag} className="inline-flex items-center gap-0.5 text-[10px] text-violet-400/80 bg-violet-500/8 px-1.5 py-0.5 rounded">
-                              #{tag}
-                              <button onClick={() => removeTag(p.id, tag)} className="hover:text-red-400 cursor-pointer ml-0.5 text-[8px] leading-none">×</button>
-                            </span>
-                          ))}
+                        {/* Time badge */}
+                        {(p.timeSpent || 0) > 0 && (
+                          <span className="hidden sm:flex items-center gap-0.5 text-[10px] text-cyan-500/60 shrink-0">
+                            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {formatTimeCompact(p.timeSpent)}
+                          </span>
+                        )}
+
+                        {/* Level */}
+                        <button onClick={() => cycleLevel(p.id, p.userLevel)}
+                          className={`shrink-0 text-sm leading-none cursor-pointer transition-all ${p.userLevel ? '' : 'opacity-30 group-hover:opacity-60'}`}
+                          title={levelConfig(p.userLevel).label}>
+                          {levelConfig(p.userLevel).emoji}
+                        </button>
+
+                        {/* Star */}
+                        <button onClick={() => updateProblem(p.id, { starred: !p.starred })}
+                          className={`shrink-0 cursor-pointer transition-colors ${p.starred ? 'text-amber-400' : 'text-zinc-800 group-hover:text-zinc-600'}`}>
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill={p.starred ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2}>
+                            <path d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+                          </svg>
+                        </button>
+
+                        {/* Actions: solve + notes + tag */}
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <button onClick={() => setFocusProblem(p)}
+                            className="p-1 rounded cursor-pointer text-zinc-800 group-hover:text-accent-500/60 hover:!text-accent-400 transition-colors"
+                            title="Focus Mode">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+                            </svg>
+                          </button>
+                          <button onClick={() => setNotesProblem(p)}
+                            className={`p-1 rounded cursor-pointer transition-colors
+                              ${p.notes ? 'text-accent-400' : 'text-zinc-800 group-hover:text-zinc-600 hover:!text-zinc-400'}`}
+                            title={p.notes ? 'Edit notes' : 'Add notes'}>
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                            </svg>
+                          </button>
                           {tagInput === p.id ? (
                             <input
                               autoFocus
                               type="text"
-                              placeholder="tag..."
-                              className="w-16 text-[10px] bg-surface-800 border border-surface-600 rounded px-1 py-0.5 text-zinc-300 focus:outline-none focus:border-accent-500/50"
+                              placeholder="tag"
+                              className="w-14 text-[10px] bg-surface-800 border border-surface-600 rounded px-1 py-0.5 text-zinc-300 focus:outline-none focus:border-accent-500/50"
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') addTag(p.id, e.target.value);
                                 if (e.key === 'Escape') setTagInput(null);
@@ -283,56 +313,17 @@ export default function ProblemList() {
                           ) : (
                             <button
                               onClick={() => setTagInput(p.id)}
-                              className="text-[10px] text-zinc-700 hover:text-zinc-500 cursor-pointer px-1 py-0.5"
-                              title="Add tag"
-                            >+tag</button>
+                              className="p-1 rounded cursor-pointer text-zinc-800 group-hover:text-zinc-600 hover:!text-zinc-400 transition-colors"
+                              title="Add tag">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
+                              </svg>
+                            </button>
                           )}
                           <datalist id={`tags-${p.id}`}>
                             {TAG_PRESETS.map(t => <option key={t} value={t} />)}
                           </datalist>
-                        </div>
-
-                        {/* Bottom: status + level + notes */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <button onClick={() => cycleStatus(p.id, p.status)}
-                              className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md border cursor-pointer transition-colors
-                                ${p.status === 'done' ? 'text-status-done border-status-done/20 bg-status-done/5 hover:bg-status-done/10' :
-                                  p.status === 'in-progress' ? 'text-status-progress border-status-progress/20 bg-status-progress/5 hover:bg-status-progress/10' :
-                                  'text-zinc-500 border-surface-600 bg-surface-800 hover:border-surface-500'}`}>
-                              <div className={`w-2 h-2 rounded-full
-                                ${p.status === 'done' ? 'bg-status-done' :
-                                  p.status === 'in-progress' ? 'bg-status-progress' :
-                                  'bg-zinc-600'}`} />
-                              {p.status === 'done' ? 'Done' : p.status === 'in-progress' ? 'Solving' : 'Todo'}
-                            </button>
-
-                            <button onClick={() => cycleLevel(p.id, p.userLevel)}
-                              className={`flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md border cursor-pointer transition-all
-                                ${levelConfig(p.userLevel).style}`}
-                              title="How tough was this for you?">
-                              <span className="text-sm leading-none">{levelConfig(p.userLevel).emoji}</span>
-                              <span className="hidden sm:inline">{levelConfig(p.userLevel).label}</span>
-                            </button>
-                          </div>
-
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => setFocusProblem(p)}
-                              className="p-1.5 rounded-md cursor-pointer transition-colors text-accent-500/50 hover:text-accent-400 hover:bg-accent-500/10"
-                              title="Solve in Focus Mode">
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
-                              </svg>
-                            </button>
-                            <button onClick={() => setNotesProblem(p)}
-                              className={`p-1.5 rounded-md cursor-pointer transition-colors
-                                ${p.notes ? 'text-accent-400 bg-accent-500/10' : 'text-zinc-700 hover:text-zinc-500 hover:bg-surface-800'}`}
-                              title={p.notes ? 'Edit notes' : 'Add notes'}>
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
-                              </svg>
-                            </button>
-                          </div>
                         </div>
                       </div>
                     ))}
