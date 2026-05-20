@@ -4,6 +4,8 @@ import { fetchSheetData } from '../services/sheetsApi';
 import { parseSheetData } from '../utils/parseSheet';
 import { mergeProblems } from '../utils/mergeEngine';
 import { getTrackerData, saveTrackerData, extractSheetId } from '../services/storage';
+import { logSolve, logTime } from '../services/activityLog';
+import { scheduleRevision } from '../utils/revisionEngine';
 
 const TrackerContext = createContext(null);
 
@@ -15,6 +17,7 @@ export function TrackerProvider({ children }) {
   const [lastSynced, setLastSynced] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState(null);
+  const [focusProblem, setFocusProblem] = useState(null);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -84,17 +87,75 @@ export function TrackerProvider({ children }) {
 
   const updateProblem = useCallback((id, fields) => {
     setProblems(prev => {
-      const updated = prev.map(p => p.id === id ? { ...p, ...fields } : p);
+      const updated = prev.map(p => {
+        if (p.id !== id) return p;
+        const merged = { ...p, ...fields };
+
+        // Auto-schedule revision when marked done
+        if (fields.status === 'done' && p.status !== 'done') {
+          const rev = scheduleRevision(merged);
+          Object.assign(merged, rev);
+          logSolve(id);
+        }
+
+        // Clear revision if un-done
+        if (fields.status && fields.status !== 'done' && p.status === 'done') {
+          merged.revisionDate = null;
+          merged.solvedAt = null;
+          merged.reviewCount = 0;
+        }
+
+        return merged;
+      });
       const data = { sheetId, lastSynced, problems: updated, classNotes };
       saveTrackerData(data);
       return updated;
     });
   }, [sheetId, lastSynced, classNotes]);
 
+  /**
+   * Record a timer session for a problem
+   */
+  const recordSession = useCallback((problemId, duration) => {
+    if (duration < 1) return;
+
+    logTime(duration);
+
+    setProblems(prev => {
+      const updated = prev.map(p => {
+        if (p.id !== problemId) return p;
+        const sessions = [...(p.sessions || []), {
+          start: new Date(Date.now() - duration * 1000).toISOString(),
+          end: new Date().toISOString(),
+          duration,
+        }];
+        return {
+          ...p,
+          timeSpent: (p.timeSpent || 0) + duration,
+          sessions,
+          lastSessionAt: new Date().toISOString(),
+        };
+      });
+      const data = { sheetId, lastSynced, problems: updated, classNotes };
+      saveTrackerData(data);
+      return updated;
+    });
+  }, [sheetId, lastSynced, classNotes]);
+
+  /**
+   * Get a random unsolved problem (respects optional filter)
+   */
+  const getRandomProblem = useCallback((filterFn) => {
+    const pool = problems.filter(p => p.status !== 'done' && (!filterFn || filterFn(p)));
+    if (pool.length === 0) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }, [problems]);
+
   return (
     <TrackerContext.Provider value={{
       sheetId, problems, classNotes, lastSynced, syncing, toast, setToast,
-      sync, setSheetUrl, updateProblem,
+      sync, setSheetUrl, updateProblem, recordSession,
+      focusProblem, setFocusProblem, getRandomProblem,
     }}>
       {children}
     </TrackerContext.Provider>

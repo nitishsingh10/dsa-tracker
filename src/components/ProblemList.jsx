@@ -2,10 +2,12 @@ import { useState, useMemo } from 'react';
 import { useTracker } from '../contexts/TrackerContext';
 import Filters from './Filters';
 import NotesModal from './NotesModal';
+import { formatTimeCompact } from '../utils/streakEngine';
 
 export default function ProblemList() {
-  const { problems, classNotes, updateProblem } = useTracker();
-  const [filters, setFilters] = useState({ search: '', difficulty: 'All', platform: 'All', status: 'All' });
+  const { problems, classNotes, updateProblem, setFocusProblem } = useTracker();
+  const [filters, setFilters] = useState({ search: '', difficulty: 'All', platform: 'All', status: 'All', tag: 'All', starred: false });
+  const [tagInput, setTagInput] = useState(null);
   const [expandedTopics, setExpandedTopics] = useState(() => {
     try {
       const saved = localStorage.getItem('dsa_expanded_topics');
@@ -23,11 +25,16 @@ export default function ProblemList() {
         const statusMap = { 'Todo': 'todo', 'In Progress': 'in-progress', 'Done': 'done' };
         if (p.status !== statusMap[filters.status]) return false;
       }
+      if (filters.tag && filters.tag !== 'All') {
+        if (!p.tags?.includes(filters.tag)) return false;
+      }
+      if (filters.starred && !p.starred) return false;
       if (filters.search) {
         const q = filters.search.toLowerCase();
         if (!p.problemName.toLowerCase().includes(q) &&
             !p.contentCovered?.toLowerCase().includes(q) &&
-            !p.className?.toLowerCase().includes(q)) return false;
+            !p.className?.toLowerCase().includes(q) &&
+            !(p.tags || []).some(t => t.toLowerCase().includes(q))) return false;
       }
       return true;
     });
@@ -90,6 +97,25 @@ export default function ProblemList() {
     const next = order[(order.indexOf(current) + 1) % order.length];
     updateProblem(id, { userLevel: next });
   };
+
+  const addTag = (problemId, tag) => {
+    const t = tag.trim().toLowerCase();
+    if (!t) return;
+    const problem = problems.find(p => p.id === problemId);
+    if (!problem) return;
+    const existing = problem.tags || [];
+    if (existing.includes(t)) return;
+    updateProblem(problemId, { tags: [...existing, t] });
+    setTagInput(null);
+  };
+
+  const removeTag = (problemId, tag) => {
+    const problem = problems.find(p => p.id === problemId);
+    if (!problem) return;
+    updateProblem(problemId, { tags: (problem.tags || []).filter(t => t !== tag) });
+  };
+
+  const TAG_PRESETS = ['revision', 'pattern', 'tricky', 'interview', 'important', 'revisit'];
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -222,6 +248,48 @@ export default function ProblemList() {
                             ${p.type === 'homework' ? 'text-amber-500/70 bg-amber-500/5' : 'text-zinc-600 bg-surface-800'}`}>
                             {p.type === 'homework' ? 'HW' : 'CW'}
                           </span>
+                          {/* Time spent badge */}
+                          {(p.timeSpent || 0) > 0 && (
+                            <span className="text-[10px] text-cyan-500/70 bg-cyan-500/5 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {formatTimeCompact(p.timeSpent)}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* User tags */}
+                        <div className="flex items-center gap-1 flex-wrap mb-1">
+                          {(p.tags || []).map(tag => (
+                            <span key={tag} className="inline-flex items-center gap-0.5 text-[10px] text-violet-400/80 bg-violet-500/8 px-1.5 py-0.5 rounded">
+                              #{tag}
+                              <button onClick={() => removeTag(p.id, tag)} className="hover:text-red-400 cursor-pointer ml-0.5 text-[8px] leading-none">×</button>
+                            </span>
+                          ))}
+                          {tagInput === p.id ? (
+                            <input
+                              autoFocus
+                              type="text"
+                              placeholder="tag..."
+                              className="w-16 text-[10px] bg-surface-800 border border-surface-600 rounded px-1 py-0.5 text-zinc-300 focus:outline-none focus:border-accent-500/50"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') addTag(p.id, e.target.value);
+                                if (e.key === 'Escape') setTagInput(null);
+                              }}
+                              onBlur={(e) => { if (e.target.value) addTag(p.id, e.target.value); else setTagInput(null); }}
+                              list={`tags-${p.id}`}
+                            />
+                          ) : (
+                            <button
+                              onClick={() => setTagInput(p.id)}
+                              className="text-[10px] text-zinc-700 hover:text-zinc-500 cursor-pointer px-1 py-0.5"
+                              title="Add tag"
+                            >+tag</button>
+                          )}
+                          <datalist id={`tags-${p.id}`}>
+                            {TAG_PRESETS.map(t => <option key={t} value={t} />)}
+                          </datalist>
                         </div>
 
                         {/* Bottom: status + level + notes */}
@@ -248,14 +316,23 @@ export default function ProblemList() {
                             </button>
                           </div>
 
-                          <button onClick={() => setNotesProblem(p)}
-                            className={`p-1.5 rounded-md cursor-pointer transition-colors
-                              ${p.notes ? 'text-accent-400 bg-accent-500/10' : 'text-zinc-700 hover:text-zinc-500 hover:bg-surface-800'}`}
-                            title={p.notes ? 'Edit notes' : 'Add notes'}>
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
-                            </svg>
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => setFocusProblem(p)}
+                              className="p-1.5 rounded-md cursor-pointer transition-colors text-accent-500/50 hover:text-accent-400 hover:bg-accent-500/10"
+                              title="Solve in Focus Mode">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+                              </svg>
+                            </button>
+                            <button onClick={() => setNotesProblem(p)}
+                              className={`p-1.5 rounded-md cursor-pointer transition-colors
+                                ${p.notes ? 'text-accent-400 bg-accent-500/10' : 'text-zinc-700 hover:text-zinc-500 hover:bg-surface-800'}`}
+                              title={p.notes ? 'Edit notes' : 'Add notes'}>
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                              </svg>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}

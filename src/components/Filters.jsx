@@ -6,7 +6,24 @@ export default function Filters({ problems, filters, setFilters }) {
     return Array.from(s).sort();
   }, [problems]);
 
+  // Collect all user tags across problems
+  const allTags = useMemo(() => {
+    const s = new Set();
+    for (const p of problems) {
+      if (p.tags) p.tags.forEach(t => s.add(t));
+    }
+    return Array.from(s).sort();
+  }, [problems]);
+
   const updateFilter = (key, value) => setFilters(prev => ({ ...prev, [key]: value }));
+
+  const activeFilterCount = [
+    filters.difficulty !== 'All',
+    filters.platform !== 'All',
+    filters.status !== 'All',
+    filters.tag !== 'All',
+    filters.starred,
+  ].filter(Boolean).length;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -20,7 +37,7 @@ export default function Filters({ problems, filters, setFilters }) {
           type="text"
           value={filters.search}
           onChange={(e) => updateFilter('search', e.target.value)}
-          placeholder="Search..."
+          placeholder="Search problems, topics..."
           className="w-full pl-9 pr-3 py-1.5 bg-surface-800 border border-surface-700 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-surface-500 transition-colors"
         />
       </div>
@@ -65,6 +82,41 @@ export default function Filters({ problems, filters, setFilters }) {
         <option value="In Progress">In Progress</option>
         <option value="Done">Done</option>
       </select>
+
+      {/* Tags filter */}
+      {allTags.length > 0 && (
+        <select
+          id="tag-filter"
+          value={filters.tag || 'All'}
+          onChange={(e) => updateFilter('tag', e.target.value)}
+          className="px-2.5 py-1.5 bg-surface-800 border border-surface-700 rounded-lg text-xs text-zinc-400 focus:outline-none cursor-pointer"
+        >
+          <option value="All">Tags</option>
+          {allTags.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+      )}
+
+      {/* Starred filter */}
+      <button
+        onClick={() => updateFilter('starred', !filters.starred)}
+        className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer border
+          ${filters.starred
+            ? 'text-amber-400 border-amber-500/30 bg-amber-500/10'
+            : 'text-zinc-600 border-surface-700 hover:text-zinc-400'}`}
+        title="Show starred only"
+      >
+        ★
+      </button>
+
+      {/* Clear filters */}
+      {activeFilterCount > 0 && (
+        <button
+          onClick={() => setFilters({ search: filters.search, difficulty: 'All', platform: 'All', status: 'All', tag: 'All', starred: false })}
+          className="px-2 py-1.5 text-[11px] text-zinc-600 hover:text-zinc-400 cursor-pointer transition-colors"
+        >
+          Clear ({activeFilterCount})
+        </button>
+      )}
     </div>
   );
 }
